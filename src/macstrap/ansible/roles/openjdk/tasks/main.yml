@@ -1,0 +1,38 @@
+---
+- name: Check openjdk Homebrew install
+  stat:
+    path: "{{ homebrew_prefix }}/opt/openjdk/libexec/openjdk.jdk"
+  register: openjdk_src
+
+- name: Check openjdk symlink
+  stat:
+    path: /Library/Java/JavaVirtualMachines/openjdk.jdk
+  register: jdk_link
+  when: openjdk_src.stat.exists
+
+- name: Symlink openjdk for system Java
+  file:
+    src: "{{ homebrew_prefix }}/opt/openjdk/libexec/openjdk.jdk"
+    dest: /Library/Java/JavaVirtualMachines/openjdk.jdk
+    state: link
+  become: true
+  when: openjdk_src.stat.exists and not jdk_link.stat.exists
+
+- name: Add JAVA_HOME to zprofile
+  lineinfile:
+    path: "{{ ansible_facts['env']['HOME'] }}/.zprofile"
+    line: 'export PATH="{{ homebrew_prefix }}/opt/openjdk/bin:$PATH"'
+    create: yes
+  when: openjdk_src.stat.exists
+
+- name: Verify Java version
+  command: "{{ homebrew_prefix }}/opt/openjdk/bin/java -version"
+  register: java_ver
+  changed_when: false
+  failed_when: false
+  when: openjdk_src.stat.exists
+
+- name: Print Java version
+  debug:
+    msg: "{{ java_ver.stderr | default(java_ver.stdout) }}"
+  when: openjdk_src.stat.exists and java_ver is defined

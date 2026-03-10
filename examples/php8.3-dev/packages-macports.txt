@@ -1,0 +1,16 @@
+# MacPorts packages
+# One package per line. Lines starting with # are ignored.
+
+php83
+php83-sqlite
+php83-openssl
+php83-mysql
+php83-mcrypt
+php83-mbstring
+php83-ldap
+php83-intl
+php83-curl
+php83-iconv
+php83-zip
+php83-gd
+

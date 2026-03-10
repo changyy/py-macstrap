@@ -1,0 +1,20 @@
+---
+# "auto" = query GitHub API for the latest release at runtime.
+# Can be pinned to a specific version if needed, e.g.: "2.12.3"
+macports_version: "auto"
+
+# "auto" = detect from the remote machine's sw_vers at runtime.
+# Can be overridden manually, e.g.: macports_macos_version: "15"
+macports_macos_version: "auto"
+macports_macos_name: "auto"
+
+# Known macOS version → codename map (used when auto-detecting)
+macports_macos_name_map:
+  "13": "Ventura"
+  "14": "Sonoma"
+  "15": "Sequoia"
+  "16": "Tahoe"
+  "26": "Tahoe"
+
+# Overridden at runtime from packages-macports.txt
+macports_packages: []

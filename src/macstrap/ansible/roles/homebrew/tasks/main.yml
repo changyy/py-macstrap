@@ -1,0 +1,73 @@
+---
+- name: Check Homebrew
+  stat:
+    path: "{{ homebrew_prefix }}/bin/brew"
+  register: brew_bin
+
+# Homebrew's install.sh uses `sudo -n` (non-interactive) when NONINTERACTIVE=1.
+# macOS sudo uses tty_tickets by default, so Ansible's become: true (which runs
+# over a non-TTY SSH connection) cannot prime a cache that Homebrew's shell will
+# see.  The reliable fix: grant passwordless sudo just for this install, then
+# revoke it immediately afterwards.
+- name: Grant NOPASSWD sudo for Homebrew installer/casks
+  copy:
+    content: "{{ ansible_user }} ALL=(ALL) NOPASSWD: ALL\n"
+    dest: /etc/sudoers.d/99-macstrap-homebrew
+    mode: '0440'
+    validate: 'visudo -cf %s'
+  become: true
+  when: not brew_bin.stat.exists or (homebrew_casks | length > 0)
+
+- name: Install Homebrew
+  shell: |
+    NONINTERACTIVE=1 /bin/bash -c \
+      "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  when: not brew_bin.stat.exists
+
+# .zprofile  → login shells (new Terminal window, SSH login)
+# .zshrc     → non-login interactive shells (sub-shells, some CI envs)
+- name: Add Homebrew shellenv to zprofile (login shells)
+  lineinfile:
+    path: "{{ ansible_facts['env']['HOME'] }}/.zprofile"
+    line: 'eval "$(/opt/homebrew/bin/brew shellenv)"'
+    create: yes
+
+- name: Add Homebrew shellenv to zshrc (non-login interactive shells)
+  lineinfile:
+    path: "{{ ansible_facts['env']['HOME'] }}/.zshrc"
+    line: 'eval "$(/opt/homebrew/bin/brew shellenv)"'
+    create: yes
+
+- name: Install Homebrew formula packages
+  community.general.homebrew:
+    name: "{{ item }}"
+    state: present
+    path: "{{ homebrew_prefix }}/bin"
+  loop: "{{ homebrew_packages }}"
+  environment:
+    PATH: "{{ homebrew_prefix }}/bin:{{ ansible_facts['env']['PATH'] }}"
+  when: homebrew_packages | length > 0
+
+- name: Install Homebrew casks
+  community.general.homebrew_cask:
+    name: "{{ item }}"
+    state: present
+    accept_external_apps: true
+  environment:
+    PATH: "{{ homebrew_prefix }}/bin:{{ ansible_facts['env']['PATH'] }}"
+  loop: "{{ homebrew_casks }}"
+  ignore_errors: true
+  register: cask_result
+  when: homebrew_casks | length > 0
+
+- name: Report failed cask installs
+  debug:
+    msg: "⚠️  {{ item.item }} install failed (may need manual GUI install)"
+  loop: "{{ cask_result.results | default([]) }}"
+  when: cask_result is defined and item.failed is defined and item.failed
+
+- name: Remove NOPASSWD sudo entry (always runs to ensure clean state)
+  file:
+    path: /etc/sudoers.d/99-macstrap-homebrew
+    state: absent
+  become: true

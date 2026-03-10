@@ -1,0 +1,35 @@
+---
+- name: Check nvm
+  stat:
+    path: "{{ ansible_facts['env']['HOME'] }}/.nvm/nvm.sh"
+  register: nvm_sh
+
+- name: Install nvm
+  shell: |
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v{{ nvm_version }}/install.sh | bash
+  when: not nvm_sh.stat.exists
+
+- name: Install Node.js versions and set default
+  shell: |
+    export NVM_DIR="{{ ansible_facts['env']['HOME'] }}/.nvm"
+    source "$NVM_DIR/nvm.sh"
+    {% for ver in node_versions %}
+    nvm install {{ ver }}
+    {% endfor %}
+    nvm alias default {{ node_default }}
+  args:
+    executable: /bin/zsh
+  register: nvm_install
+  changed_when: "'Downloading and installing' in nvm_install.stdout"
+
+- name: Install global npm packages
+  shell: |
+    export NVM_DIR="{{ ansible_facts['env']['HOME'] }}/.nvm"
+    source "$NVM_DIR/nvm.sh"
+    nvm use default
+    npm install -g {{ item }}
+  args:
+    executable: /bin/zsh
+  loop: "{{ npm_global_packages }}"
+  when: npm_global_packages | length > 0
+  changed_when: false

@@ -1,0 +1,70 @@
+---
+# ── Play 1: Bootstrap ──────────────────────────────────────────────────────
+# Uses only raw SSH (no Python required) to ensure Xcode Command Line Tools
+# are installed. Without CLT, /usr/bin/python3 on macOS shows a GUI dialog
+# instead of running, which breaks Ansible's Gathering Facts in Play 2.
+- name: Bootstrap – install Xcode Command Line Tools
+  hosts: macmini
+  gather_facts: false
+  tasks:
+    - name: Check Xcode CLT
+      raw: test -f /Library/Developer/CommandLineTools/usr/bin/git && echo "ok" || echo "missing"
+      register: clt_check
+      changed_when: false
+      tags: always
+
+    - name: Print CLT status
+      raw: echo "Xcode CLT status {{ 'already installed' if 'ok' in clt_check.stdout else 'needs install' }}"
+      changed_when: false
+      tags: always
+
+    - name: Install Xcode CLT via softwareupdate
+      raw: |
+        touch /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+        LABEL=$(softwareupdate -l 2>&1 | grep -o "Label: Command Line Tools.*" | sort -r | head -1 | sed 's/Label: //')
+        if [ -n "$LABEL" ]; then
+          softwareupdate -i "$LABEL" --verbose
+        else
+          echo "WARNING: No CLT package found via softwareupdate"
+        fi
+        rm -f /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+      become: true
+      when: "'missing' in clt_check.stdout"
+      tags: always
+
+# ── Play 2: Main setup ─────────────────────────────────────────────────────
+# Python (/usr/bin/python3) is now available after CLT is installed.
+- name: Mac Setup via macstrap
+  hosts: macmini
+  connection: ssh
+  gather_subset:
+    - "!all"
+    - "!min"
+    - env
+    - date_time
+
+  pre_tasks:
+    - name: Wait for SSH
+      wait_for_connection:
+        timeout: 30
+      tags: always
+
+    - name: Check macOS version
+      command: sw_vers -productVersion
+      register: macos_ver
+      changed_when: false
+      tags: always
+
+    - name: Print macOS version
+      debug:
+        msg: "macOS: {{ macos_ver.stdout }}"
+      tags: always
+
+  roles:
+    - { role: macports,       tags: [macports] }
+    - { role: homebrew,       tags: [homebrew] }
+    - { role: nvm,            tags: [nvm, npm] }
+    - { role: docker_desktop, tags: [docker_desktop, docker] }
+    - { role: openjdk,        tags: [openjdk, java] }
+    - { role: shell,          tags: [shell, zsh] }
+    - { role: pip_global,     tags: [pip, pip_global] }

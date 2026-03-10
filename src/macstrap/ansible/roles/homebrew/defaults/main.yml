@@ -1,0 +1,6 @@
+---
+homebrew_prefix: /opt/homebrew
+
+# Overridden at runtime from packages-brew.txt / packages-brew-casks.txt
+homebrew_packages: []
+homebrew_casks: []

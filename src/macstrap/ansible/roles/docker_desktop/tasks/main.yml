@@ -1,0 +1,20 @@
+---
+# Docker Desktop is installed via homebrew cask (handled in the homebrew role).
+# This role verifies the install and reminds about first-launch requirements.
+
+- name: Check Docker CLI
+  command: "{{ homebrew_prefix }}/bin/docker --version"
+  register: docker_ver
+  changed_when: false
+  failed_when: false
+
+- name: Print Docker version
+  debug:
+    msg: "Docker: {{ docker_ver.stdout | default('not available') }}"
+
+- name: Reminder - Docker first launch required
+  debug:
+    msg: >
+      Docker Desktop needs to be launched manually once to accept the
+      License Agreement before the CLI works over SSH.
+  when: docker_ver.rc != 0

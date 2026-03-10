@@ -1,0 +1,82 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "macstrap"
+dynamic = ["version"]
+description = "Remote Mac setup and package management via SSH"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "changyy", email = "changyy.csie@gmail.com" },
+]
+keywords = ["mac", "macos", "setup", "ansible", "homebrew", "macports", "devops"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: System :: Installation/Setup",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "click>=8.1",
+    "rich>=13.0",
+    "ansible-core>=2.16",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov",
+    "ruff",
+    "mypy",
+]
+
+[project.scripts]
+macstrap = "macstrap.cli:main"
+
+[project.urls]
+Homepage    = "https://github.com/changyy/py-macstrap"
+Repository  = "https://github.com/changyy/py-macstrap"
+"Bug Tracker" = "https://github.com/changyy/py-macstrap/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/macstrap"]
+
+[tool.hatch.build.targets.wheel.shared-data]
+# nothing here – hatchling includes all files under packages by default
+
+[tool.hatch.build]
+# Explicitly include non-Python files (YAML, j2 templates, cfg)
+include = [
+  "src/macstrap/**",
+]
+
+[tool.hatch.version]
+path = "src/macstrap/__init__.py"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts   = "-v --tb=short"

@@ -1,0 +1,8 @@
+# Homebrew formula packages
+# One package per line. Lines starting with # are ignored.
+
+git
+gh
+ripgrep
+fzf
+

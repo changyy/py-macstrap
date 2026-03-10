@@ -1,0 +1,13 @@
+---
+- name: Skip pip install (empty list)
+  debug:
+    msg: "No global pip packages configured"
+  when: pip_global_packages | default([]) | length == 0
+
+- name: Install global pip packages
+  pip:
+    name: "{{ item }}"
+    state: present
+    executable: pip3
+  loop: "{{ pip_global_packages | default([]) }}"
+  when: pip_global_packages | default([]) | length > 0

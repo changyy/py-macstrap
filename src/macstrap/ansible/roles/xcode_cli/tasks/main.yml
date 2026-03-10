@@ -1,0 +1,33 @@
+---
+- name: Check Xcode CLI Tools
+  stat:
+    path: /Library/Developer/CommandLineTools/usr/bin/git
+  register: xcode_cli
+
+- name: Install Xcode CLI Tools
+  block:
+    - name: Create trigger file
+      file:
+        path: /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+        state: touch
+      become: true
+
+    - name: Find CLI Tools package
+      shell: |
+        softwareupdate -l 2>&1 | \
+        grep -o "Label: Command Line Tools.*" | \
+        sort -r | head -1 | sed 's/Label: //'
+      register: clt_package
+      changed_when: false
+
+    - name: Install via softwareupdate
+      command: softwareupdate -i "{{ clt_package.stdout }}" --verbose
+      become: true
+      when: clt_package.stdout != ""
+
+    - name: Remove trigger file
+      file:
+        path: /tmp/.com.apple.dt.CommandLineTools.installondemand.in-progress
+        state: absent
+      become: true
+  when: not xcode_cli.stat.exists

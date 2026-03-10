@@ -1,0 +1,5 @@
+# Homebrew cask packages (GUI applications)
+# One package per line. Lines starting with # are ignored.
+
+docker
+

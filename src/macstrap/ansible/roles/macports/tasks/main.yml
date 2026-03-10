@@ -1,0 +1,191 @@
+---
+- name: Check MacPorts
+  stat:
+    path: /opt/local/bin/port
+  register: macports_bin
+
+# ── Auto-fetch latest MacPorts version from GitHub ─────────────────────────
+- name: Fetch latest MacPorts version from GitHub API
+  uri:
+    url: "https://api.github.com/repos/macports/macports-base/releases/latest"
+    method: GET
+    return_content: true
+    headers:
+      Accept: "application/vnd.github.v3+json"
+  register: _macports_release
+  when:
+    - not macports_bin.stat.exists
+    - macports_version == 'auto'
+
+- name: Set MacPorts version from latest GitHub release
+  set_fact:
+    macports_version: "{{ _macports_release.json.tag_name | regex_replace('^v', '') }}"
+  when:
+    - not macports_bin.stat.exists
+    - macports_version == 'auto'
+
+- name: Show resolved MacPorts version
+  debug:
+    msg: "MacPorts version: {{ macports_version }}"
+  when: not macports_bin.stat.exists
+
+# ── Auto-detect macOS version for the correct installer package ────────────
+- name: Detect macOS version
+  command: sw_vers -productVersion
+  register: _sw_vers
+  changed_when: false
+  when: not macports_bin.stat.exists
+
+- name: Resolve macOS major version
+  set_fact:
+    _macos_major: "{{ _sw_vers.stdout.split('.')[0] }}"
+  when: not macports_bin.stat.exists
+
+- name: Resolve macOS codename
+  set_fact:
+    _macos_name: "{{ macports_macos_name_map[_macos_major] | default('Unknown') }}"
+  when: not macports_bin.stat.exists
+
+- name: Fail if macOS version is not in the known map
+  fail:
+    msg: >
+      macOS {{ _macos_major }} is not yet in macstrap's version map.
+      Please open an issue at https://github.com/changyy/py-macstrap or
+      set macports_macos_version and macports_macos_name manually.
+  when:
+    - not macports_bin.stat.exists
+    - _macos_name == 'Unknown'
+
+- name: Override macports_macos_version / macports_macos_name with detected values
+  set_fact:
+    macports_macos_version: "{{ _macos_major }}"
+    macports_macos_name: "{{ _macos_name }}"
+  when:
+    - not macports_bin.stat.exists
+    - macports_macos_version == 'auto' or macports_macos_name == 'auto'
+
+- name: Set MacPorts pkg filename
+  set_fact:
+    macports_pkg: "MacPorts-{{ macports_version }}-{{ macports_macos_version }}-{{ macports_macos_name }}.pkg"
+
+- name: Show MacPorts installer to be used
+  debug:
+    msg: "MacPorts package: {{ macports_pkg }}  (macOS {{ macports_macos_version }} {{ macports_macos_name }})"
+  when: not macports_bin.stat.exists
+
+# ── Check availability before downloading ─────────────────────────────────
+- name: Check if MacPorts installer is available for this macOS version
+  uri:
+    url: "https://github.com/macports/macports-base/releases/download/v{{ macports_version }}/{{ macports_pkg }}"
+    method: HEAD
+    follow_redirects: safe
+    status_code: [200, 302]
+  register: pkg_available
+  failed_when: false
+  when: not macports_bin.stat.exists
+
+- name: Fail with manual install instructions if package not found
+  fail:
+    msg: |
+
+      ============================================================
+       MacPorts {{ macports_version }} does not yet have a release
+       for macOS {{ macports_macos_version }} ({{ macports_macos_name }}).
+      ============================================================
+
+      Please install MacPorts manually on the target Mac:
+
+        1. Open a browser on the Mac and go to:
+           https://www.macports.org/install.php
+
+        2. Download the installer for macOS {{ macports_macos_version }} {{ macports_macos_name }}
+           and run it.
+
+        3. Re-run macstrap — the macports role will detect the
+           existing install and skip the download step automatically.
+
+      Alternatively, check for the latest MacPorts release at:
+        https://github.com/macports/macports-base/releases/latest
+  when:
+    - not macports_bin.stat.exists
+    - pkg_available.status is defined and pkg_available.status not in [200, 302]
+
+- name: Download MacPorts installer
+  get_url:
+    url: "https://github.com/macports/macports-base/releases/download/v{{ macports_version }}/{{ macports_pkg }}"
+    dest: "/tmp/{{ macports_pkg }}"
+    mode: '0644'
+  when:
+    - not macports_bin.stat.exists
+    - pkg_available.status is defined and pkg_available.status in [200, 302]
+
+- name: Install MacPorts
+  command: installer -pkg "/tmp/{{ macports_pkg }}" -target /
+  become: true
+  when:
+    - not macports_bin.stat.exists
+    - pkg_available.status is defined and pkg_available.status in [200, 302]
+
+# ── selfupdate: skip if run within the last 24h ────────────────────────────
+- name: Check last selfupdate timestamp
+  stat:
+    path: /opt/local/var/macports/.selfupdate_timestamp
+  register: selfupdate_ts
+
+- name: Check if selfupdate is needed (older than 24h)
+  set_fact:
+    selfupdate_needed: >-
+      {{ not selfupdate_ts.stat.exists or
+         (ansible_facts['date_time'].epoch | int - selfupdate_ts.stat.mtime | int) > 86400 }}
+
+- name: Update MacPorts tree
+  command: /opt/local/bin/port -N selfupdate
+  become: true
+  changed_when: false
+  when: selfupdate_needed | bool
+
+- name: Update selfupdate timestamp
+  file:
+    path: /opt/local/var/macports/.selfupdate_timestamp
+    state: touch
+    mode: '0644'
+  become: true
+  when: selfupdate_needed | bool
+
+- name: Skip selfupdate notice
+  debug:
+    msg: "MacPorts selfupdate ran within 24h, skipping"
+  when: not (selfupdate_needed | bool)
+
+# ── Install only missing packages ─────────────────────────────────────────
+- name: Skip macports install (empty list)
+  debug:
+    msg: "No MacPorts packages configured"
+  when: macports_packages | length == 0
+
+- name: Get installed MacPorts packages
+  shell: /opt/local/bin/port echo installed | tr ' ' '\n' | sort
+  register: ports_installed
+  changed_when: false
+  become: true
+  when: macports_packages | length > 0
+
+- name: Calculate missing packages
+  set_fact:
+    missing_ports: >-
+      {{ macports_packages | difference(
+           ports_installed.stdout_lines | map('regex_replace', ' @.*', '') | list
+         ) }}
+  when: macports_packages | length > 0
+
+- name: Skip install notice
+  debug:
+    msg: "All MacPorts packages already installed"
+  when: macports_packages | length > 0 and missing_ports | length == 0
+
+- name: Install missing MacPorts packages
+  command: /opt/local/bin/port -N install {{ missing_ports | join(' ') }}
+  become: true
+  when: macports_packages | length > 0 and missing_ports | length > 0
+  async: 7200
+  poll: 30

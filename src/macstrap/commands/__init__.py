@@ -1,0 +1,1 @@
+"""macstrap CLI commands."""

@@ -1,0 +1,4 @@
+# Global npm packages (installed via nvm's default Node)
+# One package per line. Lines starting with # are ignored.
+
+openclaw

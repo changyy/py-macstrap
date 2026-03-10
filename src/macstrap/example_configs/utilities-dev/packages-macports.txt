@@ -1,0 +1,17 @@
+# MacPorts packages
+# One package per line. Lines starting with # are ignored.
+
+nvm
+cmake
+tree
+tmux
+jq
+ripgrep
+inetutils
+htop
+wget
+curl
+go
+websocat
+autossh
+ffmpeg
