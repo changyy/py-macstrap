@@ -193,7 +193,32 @@ def cmd_ssh_auth(host: str, user: str | None, update: bool, skip_key_copy: bool)
         confirmation_prompt="  Confirm sudo password",
     )
 
-    store.register(host, sudo_password, user=effective_user)
+    try:
+        store.register(host, sudo_password, user=effective_user)
+    except Exception as exc:
+        err = str(exc)
+        if "User interaction is not allowed" in err:
+            console.print(
+                "\n[red]✗[/]  Cannot save credentials to macOS Keychain in this session.\n"
+                "    - Current session has no GUI access (common over SSH/background jobs), or\n"
+                "    - Keychain is locked.\n\n"
+                "    Try one of the following:\n"
+                "      1) Run in a local macOS GUI Terminal session\n"
+                f"         [cyan]macstrap ssh-auth {host} --user {effective_user}[/]\n"
+                "      2) Unlock keychain first, then retry\n"
+                "         [cyan]security unlock-keychain ~/Library/Keychains/login.keychain-db[/]"
+            )
+            raise SystemExit(1) from exc
+
+        console.print(
+            "\n[red]✗[/]  Failed to store credentials.\n"
+            f"    {err}\n\n"
+            "    On macOS, this usually means Keychain access is blocked or needs unlock.\n"
+            "    Try:\n"
+            "      [cyan]security unlock-keychain ~/Library/Keychains/login.keychain-db[/]\n"
+            "    Then run [cyan]macstrap ssh-auth[/] again."
+        )
+        raise SystemExit(1) from exc
 
     storage_label = "macOS Keychain" if sys.platform == "darwin" else "~/.config/macstrap"
     console.print(f"\n[green]✓[/]  Sudo password stored in {storage_label}")

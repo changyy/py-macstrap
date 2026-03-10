@@ -34,16 +34,24 @@ class KeychainStore(BaseStore):
                 "-s", key,
             ],
             capture_output=True,
+            text=True,
         )
         cmd = [
             "security", "add-generic-password",
+            "-U",
             "-a", self.ACCOUNT,
             "-s", key,
             "-w", value,
         ]
         if label:
             cmd += ["-l", label]
-        subprocess.run(cmd, capture_output=True, check=True)
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            detail = (result.stderr or result.stdout).strip() or "Unknown keychain error."
+            raise RuntimeError(
+                f"Failed to write credential to macOS Keychain "
+                f"(key={key}, exit={result.returncode}): {detail}"
+            )
 
     def delete(self, key: str) -> None:
         subprocess.run(

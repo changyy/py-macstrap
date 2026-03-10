@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import getpass
+import json
 import os
 import shutil
 import subprocess
@@ -101,7 +102,9 @@ def _build_workspace(
             # Space before [] is required — without it PyYAML parses
             # "key:[]" as a plain scalar string, not an empty list.
             return " []\n"
-        return "\n" + "".join(f"  - {i}\n" for i in items)
+        # Use JSON string quoting so YAML parsing is always safe
+        # (e.g. scoped npm packages like @openai/codex).
+        return "\n" + "".join(f"  - {json.dumps(i)}\n" for i in items)
 
     pkg_yml = "---\n"
     for key, items in packages.items():
