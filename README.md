@@ -202,7 +202,7 @@ macstrap reads your package files and applies the following roles in order:
 | Bootstrap | *(raw SSH)* | Installs Xcode Command Line Tools via `softwareupdate` if missing — required before Python is available on a fresh Mac |
 | Main | `macports` | Installs MacPorts and packages from `packages-macports.txt` |
 | Main | `homebrew` | Installs Homebrew formulae from `packages-brew.txt` and casks from `packages-brew-casks.txt` |
-| Main | `nvm` | Installs nvm, Node.js (v20 + v22), and global npm packages from `packages-npm-global.txt` |
+| Main | `nvm` | Installs nvm, Node.js (v22), and global npm packages from `packages-npm-global.txt` |
 | Main | `docker` | Checks Docker Desktop status and first-launch readiness (install is driven by `packages-brew-casks.txt`, e.g. `docker`) |
 | Main | `openjdk` | Configures Java symlink/PATH for Homebrew OpenJDK (install is driven by `packages-brew.txt`, e.g. `openjdk`) |
 | Main | `shell` | Deploys a unified `~/.zshrc` with PATH entries for MacPorts, Homebrew, NVM, Java |

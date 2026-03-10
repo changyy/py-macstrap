@@ -6,6 +6,12 @@ eval "$({{ homebrew_prefix }}/bin/brew shellenv)"
 # NVM
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && source "$NVM_DIR/nvm.sh"
+if [[ -o interactive ]]; then
+  if command -v nvm >/dev/null 2>&1; then
+    nvm use 22
+  fi
+  echo "[env] node: $(node -v 2>/dev/null || echo n/a) | npm: $(npm -v 2>/dev/null || echo n/a) | $(python3 -V 2>/dev/null || echo 'python3 n/a')"
+fi
 
 # Java
 export PATH="{{ homebrew_prefix }}/opt/openjdk/bin:$PATH"
